@@ -1,2 +1,0 @@
-add_executable(TestOptimisation testOptimisation.cpp)
-target_link_libraries(TestOptimisation PUBLIC  Catch2 Catch2::Catch2WithMain OptimisationLib)
