@@ -1,0 +1,2 @@
+add_executable(GolBenchmarks GolBenchmarks.cpp)
+target_link_libraries(GolBenchmarks PUBLIC GameOfLifeLib)
