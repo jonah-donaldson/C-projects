@@ -18,7 +18,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # This step builds your Dockerfile and runs the commands inside it
       - name: Build and Test in Dev Container
         uses: devcontainers/ci@v0.3
         with:
