@@ -4,11 +4,11 @@ on:
   push:
     branches: [ main ]
   pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     strategy:
       fail-fast: false
       matrix:
@@ -23,7 +23,8 @@ jobs:
         with:
           configFile: .devcontainer/devcontainer.json
           runCmd: |
+            set -e
             cd "${{ matrix.project }}"
             cmake -B build -S .
             cmake --build build
-            ctest --test-dir build
+            ctest --test-dir build --output-on-failure
