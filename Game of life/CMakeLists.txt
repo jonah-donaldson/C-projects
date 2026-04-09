@@ -15,6 +15,8 @@ find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)
 find_package(Catch2 3 REQUIRED)
 
+enable_testing()
+
 # Set include directory and add source directory
 add_subdirectory(GolLib)
 add_subdirectory(app)
