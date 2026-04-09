@@ -1,19 +1,39 @@
-steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+name: CI for Multiple Projects
 
-    - name: Install Dependencies
-      # This installs the specific 'Packages' your CMake file is looking for
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libopenmpi-dev libcatch2-dev libmpich-dev libomp-dev
+on:
+  push:
+    branches: [ main ]
+  pull_request:
 
-    - name: Configure CMake
-      run: cmake -B build -S .
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false # Keeps the other job running if one fails
+      matrix:
+        # These MUST match your folder names exactly
+        project: ["Image reconstruction", "Game of life"]
 
-    - name: Build project
-      run: cmake --build build
+    # This ensures every 'run' command starts inside the project folder
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
 
-    - name: Run Tests
-      # If your CMake adds the tests correctly, this will run them
-      run: cd build && ctest --output-on-failure
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenmpi-dev libcatch2-dev 
+
+      - name: Configure CMake
+        run: cmake -B build -S .
+
+      - name: Build project
+        run: cmake --build build
+
+      - name: Run Tests
+        run: ctest --test-dir build
