@@ -10,30 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     
     strategy:
-      fail-fast: false # Keeps the other job running if one fails
+      fail-fast: false
       matrix:
-        # These MUST match your folder names exactly
         project: ["Image reconstruction", "Game of life"]
-
-    # This ensures every 'run' command starts inside the project folder
-    defaults:
-      run:
-        working-directory: ${{ matrix.project }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopenmpi-dev libcatch2-dev 
-
-      - name: Configure CMake
-        run: cmake -B build -S .
-
-      - name: Build project
-        run: cmake --build build
-
-      - name: Run Tests
-        run: ctest --test-dir build
+      # This step builds your Dockerfile and runs the commands inside it
+      - name: Build and Test in Dev Container
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: .devcontainer/devcontainer.json
+          runCmd: |
+            cd "${{ matrix.project }}"
+            cmake -B build -S .
+            cmake --build build
+            ctest --test-dir build

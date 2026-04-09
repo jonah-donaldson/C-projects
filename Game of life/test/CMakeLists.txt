@@ -6,3 +6,7 @@ target_link_libraries(GolTests
 )
 
 add_test(NAME GameOfLifeTests COMMAND GolTests)
+
+set_tests_properties(GameOfLifeTests PROPERTIES 
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
+)
