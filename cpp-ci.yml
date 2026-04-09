@@ -1,0 +1,19 @@
+steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      # This installs the specific 'Packages' your CMake file is looking for
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopenmpi-dev libcatch2-dev libmpich-dev libomp-dev
+
+    - name: Configure CMake
+      run: cmake -B build -S .
+
+    - name: Build project
+      run: cmake --build build
+
+    - name: Run Tests
+      # If your CMake adds the tests correctly, this will run them
+      run: cd build && ctest --output-on-failure

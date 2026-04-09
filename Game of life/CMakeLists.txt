@@ -20,3 +20,6 @@ add_subdirectory(GolLib)
 add_subdirectory(app)
 add_subdirectory(test)
 add_subdirectory(benchmark)
+
+# Enable tests
+enable_testing()
