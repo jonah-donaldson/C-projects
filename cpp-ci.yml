@@ -1,0 +1,30 @@
+name: CI for Multiple Projects
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ["Image reconstruction", "Game of life"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # This step builds your Dockerfile and runs the commands inside it
+      - name: Build and Test in Dev Container
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: .devcontainer/devcontainer.json
+          runCmd: |
+            cd "${{ matrix.project }}"
+            cmake -B build -S .
+            cmake --build build
+            ctest --test-dir build

@@ -13,6 +13,8 @@ set(CMAKE_CXX_FLAGS "-O3")
 find_package(Catch2 3 REQUIRED)
 find_package(FFTW3 REQUIRED)
 
+enable_testing()
+
 add_subdirectory(app)
 add_subdirectory(Optimisation)
 add_subdirectory(test)
