@@ -43,65 +43,62 @@ class Quadratic : public DifferentiableFunction<double>
 };
 
 template <typename T>
-class Gaussian : public DifferentiableFunction<T>
+class Gaussian : public DifferentiableFunction<double> // Lock image to double
 {
     private:
-        // Standard deviation of the Gaussian.
         double std_dev;
         vector<T> y;
-        LinearOperator<T,T> &Lin;
+        LinearOperator<double, T> &Lin; // Takes double (image) in, outputs T (measurements)
     
     public:
-        // Constructor for Gaussian likelihood function.
-        Gaussian (LinearOperator<T,T> &Lin, vector<T> &y, double std_dev) : Lin(Lin), y(y), std_dev(std_dev) {}
+        // Constructor 
+        Gaussian (LinearOperator<double, T> &Lin, vector<T> &y, double std_dev) 
+            : Lin(Lin), y(y), std_dev(std_dev) {}
 
-                // Evaluate the Gaussian likelihood function.
-                double operator()(const vector<T> &x) override
-                {
-                    // Compute the difference between the observed data and the model.
-                    vector<T> diff = Lin(x) - y;
-        
-                    // Compute the squared L2 norm of the difference.
-                    double norm = 0;
-        
-                    if (std::is_same<T, std::complex<double>>::value) 
-                    {
-                        for (size_t i = 0; i < diff.size(); ++i)
-                        {
-                            norm += std::norm(diff[i]);
-                        }
-                    }
-                    
-                    else
-                    {
-                        for (size_t i = 0; i < diff.size(); ++i)
-                        {
-                            norm += diff[i] * diff[i];
-                        }
-                    }
-                
-                 // Return the negative log-likelihood.
-                 return (norm / (2 * std_dev * std_dev));
-                }
-
-        // Compute the gradient of the Gaussian likelihood function.
-        vector<T> gradient(const vector<T> &x) override
+        // Evaluate the Gaussian likelihood function (x is always double)
+        double operator()(const vector<double> &x) override
         {
-            // Compute the difference between the observed data and the model.
-            vector<T> diff = Lin(x) - y;
+            vector<T> model = Lin(x);
+            double norm = 0;
 
-            // Compute the gradient of the negative log-likelihood.
-            if (Lin(x).size() != y.size())
+            // if constexpr is safe here since assignment enforces C++17
+            if constexpr (std::is_same<T, std::complex<double>>::value) 
             {
-                throw std::invalid_argument("The size of Lin(x) "+ std::to_string(Lin(x).size()) +" must match the size of y "+ std::to_string(y.size()) +".");
+                for (size_t i = 0; i < model.size(); ++i)
+                {
+                    auto diff = model[i] - y[i];
+                    norm += std::norm(diff);
+                }
+            }
+            else
+            {
+                for (size_t i = 0; i < model.size(); ++i)
+                {
+                    auto diff = model[i] - y[i];
+                    norm += diff * diff;
+                }
+            }
+            
+            return (norm / (2 * std_dev * std_dev));
+        }
+
+        // Compute gradient (Input x is double, returned gradient is double)
+        vector<double> gradient(const vector<double> &x) override
+        {
+            vector<T> model = Lin(x);
+
+            if (model.size() != y.size())
+            {
+                throw std::invalid_argument("Size mismatch between model and measurements.");
             }
 
-            vector<T> grad(Lin(x).size());
+            vector<T> grad(model.size());
             for (size_t i = 0; i < grad.size(); ++i)
             {
-                grad[i] = diff[i] / (std_dev * std_dev);
+                grad[i] = (model[i] - y[i]) / (std_dev * std_dev);
             }
 
+            // The adjoint maps the complex gradient perfectly back to a real double gradient!
             return Lin.adjoint(grad);
         }
 };

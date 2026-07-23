@@ -20,7 +20,7 @@ namespace ImageUtils
      * @param height
      * @return vector<double>
      */
-    DataPack ReadImage(const string &path);
+    DataPack<double> ReadImage(const string &path);
 
     /**
      * @brief Write an image to file in .pgm format
@@ -30,7 +30,7 @@ namespace ImageUtils
      * @param path
      * @return * void
      */
-    void WriteImage(const DataPack& image, const string &path);
+    void WriteImage(const DataPack<double>& image, const string &path);
 
     /**
      * @brief Generate a Gaussian kernel of a given size

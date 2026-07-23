@@ -1,6 +1,4 @@
 # Game Of Life
-
-## COMP0210 2024-25 Assignment 2
 This project implements Conway's Game of Life, a cellular automaton devised by the British mathematician John Horton Conway in 1970. It is a zero-player game, meaning its evolution is determined by its initial state, requiring no further input. One interacts with the Game of Life by creating an initial configuration and observing how it evolves.
 
 This project has three executables in the app folder GolSimulator.cpp, GolSimulatorMPI.cpp which simulate a game of life for given input parmaters the latter encorporating MPI functionality and GolStillLifeFinder which runs through a series of randomly generated grids searching for Still Life patterns, defined as base patterns which remain constant from one generation to the next. 

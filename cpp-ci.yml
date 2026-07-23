@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: ["Image reconstruction", "Game of life"]
+        project: ["Image Reconstruction", "Game of life"]
 
     steps:
       - name: Checkout code

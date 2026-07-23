@@ -15,10 +15,9 @@ using std::vector;
 using std::complex;
 
 
-
-/****************************************************************************/
-/* Section 1.2 - IO Testing
-/****************************************************************************/
+// ****************************************************************************/
+// Section 1.2 - IO Testing
+// ****************************************************************************/
 
 /** 
 * @brief Test that the image reading and writing functions are working correctly 
@@ -28,7 +27,7 @@ TEST_CASE("Test Data reading", "IO Tests")
 {    
     //Load data from a file
     std::string path = "test/data/measurements/TestSphere_proximal.dat";
-    DataPack data;
+    DataPack<double> data;
     REQUIRE_NOTHROW(data = OptimisationUtils::ReadData<double>(path));
 
     // Check that the data has been extracted correctly
@@ -39,9 +38,9 @@ TEST_CASE("Test Data reading", "IO Tests")
     CHECK(data.data[1] == 8.07497e-05);
     CHECK(data.data[2] == -0.000146522);
 }
-/****************************************************************************/
-/* Section 2.3 - Optimisation Test
-/****************************************************************************/
+// ****************************************************************************/
+// Section 2.3 - Optimisation Test
+// ****************************************************************************/
 
 /**
  * @brief Fill out this test function by filling in the 
@@ -62,15 +61,15 @@ TEST_CASE("Test optimisation algorithm for simple quadratic function", "Algorith
     vector<double> y = {1.0}; // because Phi = Id the value of y is the start value for x
     
     // Call your optimisation function with the default convergence function
-    vector<double> result = OptimisationUtils::IOA(f_quadratic, g_empty, y, Id, 0.1, 0.1, 100, 0.1);
+    vector<double> result = OptimisationUtils::IOA(f_quadratic, g_empty, y, Id, 0.1, 0.1, 1000, 1e-7);
 
     // Check that your result is close to 0 
-    REQUIRE(result[0] == Catch::Approx({0}).margin(1e-6));
+    REQUIRE(result[0] == Catch::Approx(0.0).margin(1e-6));
 }
 
-/****************************************************************************/
-/* Section 3.1 - Linear Operator Testing
-/****************************************************************************/
+// ****************************************************************************/
+// Section 3.1 - Linear Operator Testing
+// ****************************************************************************/
 
 // Write a test to check your sub-sampler operator
 TEST_CASE("Test sub-sampler", "Linear Operator Tests")
@@ -82,7 +81,7 @@ TEST_CASE("Test sub-sampler", "Linear Operator Tests")
     vector<size_t> indices = {0, 2, 4};
 
     // Define the sub-sampler operator
-    SubSampler sub_sampler(indices);
+    SubSampler<double> sub_sampler(indices);
 
     // Apply the sub-sampler operator to the vector
     vector<double> y = sub_sampler(x);
@@ -105,18 +104,18 @@ TEST_CASE("Test Convolution", "Linear Operator Tests")
     //Test Convolution operator forward operation.
     // Load test image and kernel data
     string image_path = "test/data/images/TestSphere.pgm";
-    DataPack image = ImageUtils::ReadImage(image_path);
+    DataPack<double> image = ImageUtils::ReadImage(image_path);
     vector<double> kernel_data = ImageUtils::GenSincKernel(image.width, image.height, 1.0);
 
     // Load expectation images
     string blurred_image_path = "test/data/images/TestSphere_convolved.pgm";
-    DataPack blurred_image_expected = ImageUtils::ReadImage(blurred_image_path);
+    DataPack<double> blurred_image_expected = ImageUtils::ReadImage(blurred_image_path);
 
     string deblurred_image_path = "test/data/images/TestSphere_deconvolved.pgm";
-    DataPack deblurred_image_expected = ImageUtils::ReadImage(deblurred_image_path);
+    DataPack<double> deblurred_image_expected = ImageUtils::ReadImage(deblurred_image_path);
 
     // Write test image to file for visual inspection
-    ImageUtils::WriteImage(image,"test/data/testing_images/TestSphere.pgm");
+    ImageUtils::WriteImage(image,"test/data/test_out/TestSphere.pgm");
 
     // Applyforward Convolution operator and adjoint
     Convolution conv(kernel_data, image.width, image.height, 1e-2);
@@ -132,8 +131,8 @@ TEST_CASE("Test Convolution", "Linear Operator Tests")
     }
 
     // Write image to file for visual inspection
-    DataPack blurred_image_pack = {image.width, image.height, blurred_image};
-    ImageUtils::WriteImage(blurred_image_pack,"test/data/testing_images/TestSphere_blurred.pgm");
+    DataPack<double> blurred_image_pack = {image.width, image.height, blurred_image};
+    ImageUtils::WriteImage(blurred_image_pack,"test/data/test_out/TestSphere_blurred.pgm");
 
     // Check that the output is close to the expected deblurred image
     for (size_t i = 0; i < image.data.size(); i++)
@@ -143,13 +142,13 @@ TEST_CASE("Test Convolution", "Linear Operator Tests")
     }
 
     // Write image to file for visual inspection
-    DataPack deblurred_image_pack = {image.width, image.height, deblurred_image};
-    ImageUtils::WriteImage(deblurred_image_pack,"test/data/testing_images/TestSphere_deblurred.pgm");
+    DataPack<double> deblurred_image_pack = {image.width, image.height, deblurred_image};
+    ImageUtils::WriteImage(deblurred_image_pack,"test/data/test_out/TestSphere_deblurred.pgm");
 }
 
-/****************************************************************************/
-/* Section 3.2 - Gaussian Function Testing
-/****************************************************************************/
+// ****************************************************************************/
+// Section 3.2 - Gaussian Function Testing
+// ****************************************************************************/
 
 // TODO: Write a test to check that your Gaussian function is working correctly
 TEST_CASE("Test Gaussian Log-Likelihood", "Differentiable Function Tests")
@@ -171,7 +170,7 @@ TEST_CASE("Test Gaussian Log-Likelihood", "Differentiable Function Tests")
     REQUIRE(gradient == vector<double>({0.25, 0.5, 0.75, 1.0, 1.25}));
 
     // Check the result of the Gaussian function and its gradient with a sub-sampling operator
-    SubSampler sub_sampler({0, 2, 4});
+    SubSampler<double> sub_sampler({0, 2, 4});
     y = {1.0, 3.0, 5.0}; // New measurement set
     
     Gaussian<double> sub_gauss(sub_sampler, y, std_dev);
@@ -184,15 +183,15 @@ TEST_CASE("Test Gaussian Log-Likelihood", "Differentiable Function Tests")
     REQUIRE(gradient == vector<double>({0.25, 0.0, 0.75, 0.0, 1.25}));
 }
 
-/****************************************************************************/
-/* Section 3.3 - DCT L1-Norm Testing
-/****************************************************************************/
+// ****************************************************************************/
+// Section 3.3 - DCT L1-Norm Testing
+// ****************************************************************************/
 
 // TODO: Write a test to check that your DCT L1-Norm function is working correctly
 TEST_CASE("Test DCT L1-Norm", "Non-Differentiable Function Tests")
 {
     string image_path = "test/data/images/TestSphere.pgm";
-    DataPack image = ImageUtils::ReadImage(image_path);
+    DataPack<double> image = ImageUtils::ReadImage(image_path);
 
     // Define DCT l1-norm prior and apply it to the image to get l1_norm
     // Use default threshold tau = 0.1
@@ -201,7 +200,7 @@ TEST_CASE("Test DCT L1-Norm", "Non-Differentiable Function Tests")
     REQUIRE_THAT(l1_norm, WithinRel(1.93e8, 0.05));
 
     // Calculate the proximal and check that it is close to the expected proximal
-    DataPack expected_prox = OptimisationUtils::ReadData<double>("test/data/measurements/TestSphere_proximal.dat");
+    DataPack<double> expected_prox = OptimisationUtils::ReadData<double>("test/data/measurements/TestSphere_proximal.dat");
     
     vector<double> proximal = dctl1.proximal(image.data);
     for (size_t i = 0; i < image.data.size(); i++)
@@ -211,9 +210,9 @@ TEST_CASE("Test DCT L1-Norm", "Non-Differentiable Function Tests")
     }
 }
 
-/****************************************************************************/
-/* Section 3.5 - Integration Test
-/****************************************************************************/
+// ****************************************************************************/
+// Section 3.5 - Integration Test
+// ****************************************************************************/
 
 TEST_CASE("Recover From Synthetic Data", "Integration Test")
 {
@@ -226,7 +225,7 @@ TEST_CASE("Recover From Synthetic Data", "Integration Test")
     double tau = 0.1;
 
     string image_path = "test/data/images/TestSphere.pgm";
-    DataPack image = ImageUtils::ReadImage(image_path);
+    DataPack<double> image = ImageUtils::ReadImage(image_path);
 
     // Define your linear operator to drop 20% of the pixels in the image
     vector<size_t> indices;
@@ -237,7 +236,7 @@ TEST_CASE("Recover From Synthetic Data", "Integration Test")
             indices.push_back(i);
         }
     }
-    SubSampler sub_sampler(indices);   
+    SubSampler<double> sub_sampler(indices);   
 
     vector<double> y = sub_sampler(image.data);
 
@@ -249,26 +248,26 @@ TEST_CASE("Recover From Synthetic Data", "Integration Test")
     vector<double> result = OptimisationUtils::IOA(gauss, dctl1, y, sub_sampler, alpha, beta, 100, tol);
 
     // Write the result to a file for visual inspection
-    DataPack result_pack = {image.width, image.height, result};
-    ImageUtils::WriteImage(result_pack, "test/data/testing_images/TestSphere_Reconstructed.pgm");
+    DataPack<double> result_pack = {image.width, image.height, result};
+    ImageUtils::WriteImage(result_pack, "test/data/test_out/TestSphere_reconstructed.pgm");
    
     // Write the dirty image to a file for visual inspection
-    DataPack subsampled_image_pack = {image.width, image.height, sub_sampler.adjoint(y)};
-    ImageUtils::WriteImage(subsampled_image_pack, "test/data/testing_images/TestSphere_sub_sampled.pgm");
+    DataPack<double> subsampled_image_pack = {image.width, image.height, sub_sampler.adjoint(y)};
+    ImageUtils::WriteImage(subsampled_image_pack, "test/data/test_out/TestSphere_sub_sampled.pgm");
 
 }
 
-/****************************************************************************/
-/* Section 5.1 - Code testing
-/****************************************************************************/
+// ****************************************************************************/
+// Section 5.1 - Code testing
+// ****************************************************************************/
 TEST_CASE("App code", "Functionality Check")
 {
     // Load and write the image
     string image_path = "data/measurements/UtahTeapot_convolved.dat";
-    DataPack image = OptimisationUtils::ReadData<double>(image_path);
+    DataPack<double> image = OptimisationUtils::ReadData<double>(image_path);
 
-    DataPack image_pack = {image.width, image.height, image.data};
-    ImageUtils::WriteImage(image_pack, "images/UtahTeapot_blurred.pgm");
+    DataPack<double> image_pack = {image.width, image.height, image.data};
+    ImageUtils::WriteImage(image_pack, "test/data/test_out/UtahTeapot_blurred.pgm");
 
     // Generate the kernel
     vector<double> kernel = ImageUtils::GenSincKernel(image.width, image.height, 1);
@@ -277,8 +276,8 @@ TEST_CASE("App code", "Functionality Check")
     Convolution conv(kernel, image.width, image.height, 1e-2);
 
     vector<double> dirty_image = conv.adjoint(image.data);
-    DataPack dirty_image_pack = {image.width, image.height, dirty_image};
-    ImageUtils::WriteImage(dirty_image_pack, "images/UtahTeapot_blurred_dirty.pgm");
+    DataPack<double> dirty_image_pack = {image.width, image.height, dirty_image};
+    ImageUtils::WriteImage(dirty_image_pack, "test/data/test_out/UtahTeapot_blurred_dirty.pgm");
 
     // Define the Gaussian likelihood and DCT l1-norm prior
     double sigma = 1.0;
@@ -294,17 +293,17 @@ TEST_CASE("App code", "Functionality Check")
     vector<double> result = OptimisationUtils::IOA(gauss, dctl1, image.data, conv, alpha, beta, 500, tol);
 
     // Write the result to a file for visual inspection
-    DataPack result_pack = {image.width, image.height, result};
-    ImageUtils::WriteImage(result_pack, "images/UtahTeapot_Convolution_Optimised.pgm");
+    DataPack<double> result_pack = {image.width, image.height, result};
+    ImageUtils::WriteImage(result_pack, "test/data/test_out/UtahTeapot_convolution_optimised.pgm");
 }
 
-/****************************************************************************/
-/* Section 6.1 - FT Operator Testing
-/****************************************************************************/
+// ****************************************************************************/
+// Section 6.1 - FT Operator Testing
+// ****************************************************************************/
 TEST_CASE("Fourier Transform Operator", "Linear Operator Tests")
 {
     // Load a test set
-    DataPack x = ImageUtils::ReadImage("test/data/images/TestSphere.pgm");
+    DataPack<double> x = ImageUtils::ReadImage("test/data/images/TestSphere.pgm");
 
     // Define the Fourier Transform operator
     FourierTransform ft(x.width, x.height);
@@ -323,8 +322,27 @@ TEST_CASE("Fourier Transform Operator", "Linear Operator Tests")
     }
 }
 
-/****************************************************************************/
-/* Section 6.2 - Operator Composition Testing
-/****************************************************************************/
+// ****************************************************************************/
+// Section 6.2 - Operator Composition Testing
+// ****************************************************************************/
 // Test for the composition of two identity operators
+TEST_CASE("Operator Composition Testing", "Linear Operator Tests")
+{
+    // Define two Identity operators
+    Identity id1;
+    Identity id2;
+
+    // Compose them: id2(id1(x))
+    CompositeOperator<double, double, double> comp(id1, id2);
+
+    vector<double> x = {1.0, 2.0, 3.0, 4.0, 5.0};
+    
+    // Apply composed forward operator
+    vector<double> y = comp(x);
+    REQUIRE(y == x);
+
+    // Apply composed adjoint operator
+    vector<double> x_prime = comp.adjoint(y);
+    REQUIRE(x_prime == x);
+}
 

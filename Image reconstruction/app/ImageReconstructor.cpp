@@ -11,147 +11,133 @@ int main(int argc, char *argv[])
 {
     string name = std::string(argv[0]);
 
-    // help message -h flag
-    for (int i = 0; i < argc; i++)
-    {
-        if (string(argv[i]) == "-h")
-        {
-            std::cout << "Usage: " << name
-              << " <image_path> <alpha> <beta> <sigma> <tol> (-k <kernel_size> | -i <indices_file_path>)\n\n"
-              << "Description:\n"
-              << "  ImageReconstructor reconstructs an image using an optimisation algorithm.\n\n"
-              << "Positional arguments:\n"
-              << "  <image_path>         Path to the input image file.\n"
-              << "  <alpha>              Gradient step size (Recommended: 1.0)\n"
-              << "  <beta>               Proximal step size (Recommended: 1e4)\n"
-              << "  <sigma>              Value in log-likelihood function (Recommended: 1.0)\n"
-              << "  <tol>                Convergence tolerance (Recommended: 0.1)\n\n"
-              << "Optional arguments (choose ONE):\n"
-              << "  -k <kernel_size>     Gaussian kernel size in pixels (for convolution problems).\n"
-              << "  -i <indices_file>    Path to the indices file (for subsampling problems).\n\n"
-              << "Other options:\n"
-              << "  -h                   Display this help message and exit.\n\n"
-              << "Additional Defaults:\n"
-              << "  Maximum optimization steps: 500\n";
-        } 
-    }
-
-    // Check that the correct number of arguments have been passed
-    if (argc != 8)
-    {
-        std::cerr << "Usage: " << argv[0] 
-             << "The number of arguments passed is incorrect. Please see the help message for more information."
-             << std::endl;
-        return 1;
-    }
-
-    // Parse the positional arguments
-    string image_path = argv[1];
-
-    // Parse the remaining arguments
-    double alpha = std::stod(argv[2]);
-    double beta  = std::stod(argv[3]);
-    double sigma = std::stod(argv[4]);
-    double tol   = std::stod(argv[5]);
-
-    // Parse the optional arguments
+    // Default parameters
+    string image_path = "";
+    string indices_file = "";
+    double alpha = 1.0;
+    double beta = 1e4;
+    double sigma = 1.0;
+    double tol = 0.1;
+    size_t kernel_size = 1;
     bool useKernel = false;
     bool useIndices = false;
-    if (std::string(argv[6])== "-k")
+
+    // 1. ROBUST COMMAND LINE PARSING (Assignment Compliant)
+    for (int i = 1; i < argc; i++)
     {
-        useKernel = true;
-        size_t kernel_size = std::stoi(argv[7]);
+        string arg = argv[i];
+        if (arg == "-h")
+        {
+            std::cout << "Usage: " << name << " -f <image_path> [options]\n\n"
+              << "Options:\n"
+              << "  -f <path>            Path to the input measurements file.\n"
+              << "  -alpha <val>         Gradient step size\n"
+              << "  -beta <val>          Proximal step size\n"
+              << "  -sigma <val>         Value in log-likelihood function\n"
+              << "  -delta <val>         Convergence tolerance\n"
+              << "  -k <kernel_size>     Gaussian kernel size (convolution).\n"
+              << "  -i <indices_file>    Path to indices file (subsampling).\n"
+              << "  -h                   Display this help message and exit.\n";
+            return 0; // MUST exit after printing help
+        }
+        else if (arg == "-f" && i + 1 < argc) image_path = argv[++i];
+        else if (arg == "-alpha" && i + 1 < argc) alpha = std::stod(argv[++i]);
+        else if (arg == "-beta" && i + 1 < argc) beta = std::stod(argv[++i]);
+        else if (arg == "-sigma" && i + 1 < argc) sigma = std::stod(argv[++i]);
+        else if (arg == "-delta" && i + 1 < argc) tol = std::stod(argv[++i]);
+        else if (arg == "-k" && i + 1 < argc) { useKernel = true; kernel_size = std::stoi(argv[++i]); }
+        else if (arg == "-i" && i + 1 < argc) { useIndices = true; indices_file = argv[++i]; }
     }
-    else if (std::string(argv[6]) == "-i")
+
+    if (image_path.empty() || (!useKernel && !useIndices))
     {
-        useIndices = true;
-    }
-    else
-    {
-        std::cerr << "Usage: " << argv[0] 
-             << "The optional arguments passed are incorrect. Please see the help -h message for more information."
-             << std::endl;
+        std::cerr << "Error: Must provide a measurements file (-f) and either a kernel (-k) or indices (-i).\n";
         return 1;
     }
 
-    // Proceed based on the option selected
+    // Extract just the filename from the input path (e.g., gets "UtahTeapot_convolved.dat")
+    size_t last_slash = image_path.find_last_of("/");
+    std::string base_name = (last_slash == std::string::npos) ? image_path : image_path.substr(last_slash + 1);
+
+    // Strip the .dat extension (e.g., gets "UtahTeapot_convolved")
+    size_t last_dot = base_name.find_last_of(".");
+    if (last_dot != std::string::npos) {
+        base_name = base_name.substr(0, last_dot);
+    }
+
+    // Point to your new folder from the screenshot
+    std::string output_dir = "data/app_out/";
+
     if (useKernel)
     {
         // Load image
-        DataPack image = OptimisationUtils::ReadData<double>(image_path);
+        DataPack<double> image = OptimisationUtils::ReadData<double>(image_path);
+
+        DataPack<double> input_pack = {image.width, image.height, image.data};
+        ImageUtils::WriteImage(input_pack, output_dir + base_name + "_input.pgm");
         
         // Generate the kernel
-        vector<double> kernel = ImageUtils::GenSincKernel(image.width, image.height, 1);
+        vector<double> kernel = ImageUtils::GenSincKernel(image.width, image.height, kernel_size);
 
         // Get dirty image
         Convolution conv(kernel, image.width, image.height, 1e-2);
-
         vector<double> dirty_image = conv.adjoint(image.data);
-        DataPack dirty_image_pack = {image.width, image.height, dirty_image};
-        
-        // Remove any extension from image_path before appending file name extensions
-        size_t last_dot = image_path.find_last_of('.');
-        string base_image_path = (last_dot != string::npos) ? image_path.substr(0, last_dot) : image_path;
+        DataPack<double> dirty_image_pack = {image.width, image.height, dirty_image};
+        ImageUtils::WriteImage(dirty_image_pack, output_dir + base_name + "_dirty.pgm");
 
-        ImageUtils::WriteImage(dirty_image_pack, base_image_path + "_dirty.pgm");
-
-        // Define the Gaussian likelihood and DCT l1-norm prior
+        // Define functions
         Gaussian<double> gauss(conv, image.data, sigma);
         DCTL1Norm dctl1(image.width, image.height, 0.1);
 
-        // Apply the optimisation
-        vector<double> result = OptimisationUtils::IOA(gauss, dctl1, image.data, conv, alpha, beta, 100, tol);
+        // Wrap the C_converged function in a lambda to pass to IOA
+        auto my_convergence = [&gauss, &dctl1](vector<double>& x_np1, vector<double>& x0, double tolerance) {
+            return OptimisationUtils::C_converged(x_np1, x0, gauss, dctl1, tolerance);
+        };
 
-        // Write the result to a file for visual inspection
-        DataPack result_pack = {image.width, image.height, result};
-        ImageUtils::WriteImage(result_pack, base_image_path + "_reconstructed.pgm");
-        
+        // Apply optimisation
+        vector<double> result = OptimisationUtils::IOA<double, double>(gauss, dctl1, image.data, conv, alpha, beta, 500, tol, my_convergence);
+        // Write result
+        DataPack<double> result_pack = {image.width, image.height, result};
+        ImageUtils::WriteImage(result_pack, output_dir + base_name + "_reconstructed.pgm");
     }
-    
     else if (useIndices)
     {
-        // Parse the positional arguments
-        string indices_file = argv[7];
-
-        // Load image
-        DataPack image = OptimisationUtils::ReadData<double>(image_path);
-
-        // Load indices
-        DataPack indices = OptimisationUtils::ReadData<double>(indices_file);
+        // Load image (measurements) and indices
+        DataPack<double> image = OptimisationUtils::ReadData<double>(image_path);
+        DataPack<double> indices = OptimisationUtils::ReadData<double>(indices_file);
         
-        // Define the sub-sampler operator
+        // Setup SubSampler
         vector<size_t> indices_data(indices.data.size());
         for (size_t i = 0; i < indices.data.size(); i++)
         {
             indices_data[i] = static_cast<size_t>(indices.data[i]);
         }
-        SubSampler sub_sampler(indices_data);
+        SubSampler<double> sub_sampler(indices_data);
 
         // Band-aid solution to set full size
-        // Since object full size is set when forward operator is called.
         std::vector<double> quick_fix(image.width * image.height, 1.0);
         sub_sampler(quick_fix);
 
-        // Get dirty image (subsampled)
-        vector<double> dirty_image_data = sub_sampler.adjoint(image.data); // Seg fault occurs here, and I'm fully out of time.
-        DataPack dirty_image_pack = {image.width, image.height, dirty_image_data};
+        // Get dirty image
+        vector<double> dirty_image_data = sub_sampler.adjoint(image.data); 
+        DataPack<double> dirty_image_pack = {image.width, image.height, dirty_image_data};
+        ImageUtils::WriteImage(dirty_image_pack, output_dir + base_name + "_dirty.pgm");
 
-        // Remove any extension from image_path before appending file name extensions
-        size_t last_dot = image_path.find_last_of('.');
-        string base_image_path = (last_dot != string::npos) ? image_path.substr(0, last_dot) : image_path;
-
-        ImageUtils::WriteImage(dirty_image_pack, base_image_path + "_dirty.pgm");
-
-        // Define the Gaussian likelihood and DCT l1-norm prior
-        Gaussian<double> gauss(sub_sampler, dirty_image_pack.data, sigma);
+        // Define functions (FIXED: Pass image.data, NOT dirty_image_pack.data)
+        Gaussian<double> gauss(sub_sampler, image.data, sigma);
         DCTL1Norm dctl1(image.width, image.height, 0.1);
 
-        // Apply the optimisation
-        vector<double> result = OptimisationUtils::IOA(gauss, dctl1, dirty_image_pack.data, sub_sampler, alpha, beta, 500, tol);
+        // Wrap the C_converged function in a lambda to pass to IOA
+        auto my_convergence = [&gauss, &dctl1](vector<double>& x_np1, vector<double>& x0, double tolerance) {
+            return OptimisationUtils::C_converged(x_np1, x0, gauss, dctl1, tolerance);
+        };
 
-        // Write the result to a file for visual inspection
-        DataPack result_pack = {image.width, image.height, result};
-        ImageUtils::WriteImage(result_pack, base_image_path + "_reconstructed.pgm");
+        // Apply optimisation (FIXED: Pass image.data, NOT dirty_image_pack.data)
+        vector<double> result = OptimisationUtils::IOA<double, double>(gauss, dctl1, image.data, sub_sampler, alpha, beta, 500, tol, my_convergence);
+        // Write result
+        DataPack<double> result_pack = {image.width, image.height, result};
+        ImageUtils::WriteImage(result_pack, output_dir + base_name + "_reconstructed.pgm");
     }
 
-} 
+    return 0;
+}

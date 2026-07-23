@@ -55,9 +55,9 @@ public:
  * Extracts a subset of the input vector using the provided indices.
  * The adjoint operator maps the subsampled vector back to its original full space.
  */
-//TODO: Impliment error handling properly.
 
-class SubSampler : public LinearOperator<double,double>
+template <typename T>
+class SubSampler : public LinearOperator<T, T>
 {
 private:
     // Indices specifying the positions to extract from the input vector.
@@ -73,13 +73,13 @@ public:
         : indices(indices_in) {}
 
     //Forward transform: y = Φ(x)
-    vector<double> operator()(const vector<double>& x) override 
+    std::vector<T> operator()(const std::vector<T>& x) override 
     {
         // Overwrite the full_size.
         full_size = x.size();
         
         // Initialize the subsampled vector.
-        vector<double> y;
+        std::vector<T> y;
         y.reserve(indices.size());
 
         // Loop over the indices and extract the corresponding elements.
@@ -96,15 +96,15 @@ public:
     }
     
     //Adjoint transform: x' = Φ^(dagger)(y)
-    vector<double> adjoint(const vector<double>& y) override 
+    std::vector<T> adjoint(const std::vector<T>& y) override 
     {
         if (full_size == 0)
         {
             throw std::runtime_error("Full size of the input vector is not set.");
         }
 
-        // Initialize full vector with default zeros.
-        vector<double> x_prime(full_size, 0.0);
+        // Initialize full vector with default zeros (T() handles both double and complex zero).
+        std::vector<T> x_prime(full_size, T());
 
         // Map each element from the subsampled vector back to the corresponding position.
         for (size_t i = 0; i < indices.size(); ++i) 
@@ -118,7 +118,6 @@ public:
         }
         return x_prime;
     }
-
 };
 
 /**
@@ -428,5 +427,34 @@ public:
         
         return x;
     }
+};
 
+/**
+ * @brief Composite linear operator.
+ * 
+ * Chains two linear operators together: (Phi o Psi)(x) = Psi(Phi(x))
+ */
+template <typename T_in, typename T_mid, typename T_out>
+class CompositeOperator : public LinearOperator<T_in, T_out>
+{
+private:
+    LinearOperator<T_in, T_mid>& phi;
+    LinearOperator<T_mid, T_out>& psi;
+
+public:
+    // Constructor takes references to the two operators to be chained
+    CompositeOperator(LinearOperator<T_in, T_mid>& phi_in, LinearOperator<T_mid, T_out>& psi_in)
+        : phi(phi_in), psi(psi_in) {}
+
+    // Forward transform: Psi(Phi(x))
+    vector<T_out> operator()(const vector<T_in>& x) override
+    {
+        return psi(phi(x));
+    }
+
+    // Adjoint transform: Phi^dagger(Psi^dagger(y))
+    vector<T_in> adjoint(const vector<T_out>& y) override
+    {
+        return phi.adjoint(psi.adjoint(y));
+    }
 };

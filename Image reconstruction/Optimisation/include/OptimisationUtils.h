@@ -11,6 +11,7 @@
 #include "LinearOperator.h"
 #include "VectorUtils.h"
 #include <iostream>
+#include <functional>
 
 using std::string;
 using std::vector;
@@ -49,7 +50,7 @@ namespace OptimisationUtils
      * @return vector<T>
      */
     template <typename T>
-    DataPack ReadData(const string &path)
+    DataPack<T> ReadData(const string &path)
     {
         std::fstream file;
         file.open(path, std::ios::in);
@@ -146,7 +147,6 @@ namespace OptimisationUtils
      * @return true
      * @return false
      */
-    // TODO: Response md.
     template <typename T>
     bool C_converged(vector<T> &x2, vector<T> &x1, DifferentiableFunction<T> &f, NonDifferentiableFunction<T> &g, double tol)
     {
@@ -170,30 +170,32 @@ namespace OptimisationUtils
     * @param tol : convergence tolerance
     * @return Vector<T> : Data vector at the final iteration
     */
-    template <typename T>
-    vector<T> IOA (DifferentiableFunction<T> &f,
-            NonDifferentiableFunction<T> &g,
-            const vector<T> &y, 
-            LinearOperator<T,T> &A,
+    template <typename Tx, typename Ty>
+    vector<Tx> IOA (DifferentiableFunction<Tx> &f,
+            NonDifferentiableFunction<Tx> &g,
+            const vector<Ty> &y, 
+            LinearOperator<Tx, Ty> &A,
             double alpha, 
             double beta, 
             double n_max, 
-            double tol) 
+            double tol,
+            std::function<bool(vector<Tx>&, vector<Tx>&, double)> convergence_func = converged<Tx>
+        )
     {
-        vector<T> x0 = A.adjoint(y);
-        vector<T> x_np1 = x0; // Initialize x_np1 with x0
-        vector<T> x_temp = x0; // Initialize x_temp with x0
+        vector<Tx> x0 = A.adjoint(y);
+        vector<Tx> x_np1 = x0; // Initialize x_np1 with x0
+        vector<Tx> x_temp = x0; // Initialize x_temp with x0
         for (size_t i = 0; i < n_max; i++) 
         {
             x_temp = x0 - alpha * f.gradient(x0);
             x_np1 = x_temp - beta * g.proximal(x_temp); 
 
-            if (C_converged<T>(x_np1, x0, f, g, tol)) // TDO: add multi convergence function option.
+            if (convergence_func(x_np1, x0, tol)) 
             {
-                std::cout << "Converged at iteration: " << i << std::endl; // Final iteration
-                return x_np1; // Return the value of the function at the final iteration
+                std::cout << "Converged at iteration: " << i << std::endl; 
+                return x_np1; 
             }
-            x0 = x_np1; // Update x0 for the next iteration
+            x0 = x_np1;
         }
         std::cout << "No convergence" << std::endl; // Print if no convergence
         return x_np1; // Return the last value if no convergence

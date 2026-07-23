@@ -1,4 +1,4 @@
-.
+Game of Life
 ├── app
 │   ├── CMakeLists.txt
 │   ├── GolSimulator.cpp

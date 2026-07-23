@@ -6,7 +6,7 @@
 #include <cmath>
 #include <numeric>
 
-DataPack ImageUtils::ReadImage(const string &path)
+DataPack<double> ImageUtils::ReadImage(const string &path)
 {
     std::fstream file;
     file.open(path, std::ios::in);
@@ -30,7 +30,7 @@ DataPack ImageUtils::ReadImage(const string &path)
         return {width, height, data};
 }
 
-void ImageUtils::WriteImage(const DataPack& image, const string &path)
+void ImageUtils::WriteImage(const DataPack<double>& image, const string &path)
 {
     std::fstream file;
     file.open(path, std::ios::out);
