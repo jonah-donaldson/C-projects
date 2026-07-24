@@ -6,6 +6,7 @@
 #include <random> // For std::random_device, std::mt19937
 #include <chrono> // For std::chrono
 #include <thread> // For std::this_thread::sleep_for
+#include <filesystem>
 
 #include "GolGrid.h"
 #include "GolIterator.h"
@@ -29,6 +30,7 @@ void PrintHelp(const std::string &AppName)
               << "  -r, --random          Initialise grid randomly. Requires grid size and number of alive cells\n"
               << "  -s, --seed            Specify a seed for random initialisation (only valid with --random)\n"
               << "  -g, --generations     Number of generations to simulate \n"
+              << "  -d, --delay           Delay between generations in milliseconds for visualization (optional)\n"
               << "  -o, --output           Specify output filename to save the final grid state\n\n"
               << "Note: Both mode (--file or --random) and --generations are required.\n";
 }
@@ -57,6 +59,7 @@ int main(int argc, char **argv)
     bool generations_specified = false; // Track if -g was seen
     size_t generations = 0;
     bool IsOutputFile = false;
+    size_t delay_ms = 0;
     std::string OutputFileName;
 
     // Parse command line arguments 
@@ -144,6 +147,20 @@ int main(int argc, char **argv)
             return 1;
         }
     }
+    
+    // Delay check
+    else if (arg == "-d" || arg == "--delay") 
+    {
+        if (i + 1 < argc && argv[i + 1][0] != '-') 
+        {
+            delay_ms = std::stoul(argv[++i]);
+        } 
+        else 
+        {
+            std::cerr << "Missing millisecond value after --delay\n";
+            return 1;
+        }
+    }
 
     // Output file check
     else if (arg == "-o" || arg == "--output") 
@@ -228,15 +245,22 @@ for (size_t i = 0; i < generations; ++i)
     std::cout << "Generation: " << i + 1 << "\n";
     iterator.printGrid();
 
-    // Optional: Add a delay for better visualisation
-    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    // Add a delay for better visualisation
+    std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
 } 
 
 // Write final grid state to file if specified
 if (IsOutputFile) 
 {
-    // Make destination file
-    std::ofstream OutputFile(OutputFileName);
+    // Define the output directory and ensure it exists
+    std::filesystem::path OutDir = "./app/outputs";
+    std::filesystem::create_directories(OutDir); 
+    
+    // Append the user's filename to the directory path
+    std::filesystem::path FullPath = OutDir / OutputFileName;
+
+    // Make destination file using the full path
+    std::ofstream OutputFile(FullPath);
     if (OutputFile)
     {
         // Turn print output into string
@@ -248,11 +272,16 @@ if (IsOutputFile)
 
         std::cout.rdbuf(CoutBuffer); // restore original buffer
         std::string output = ss.str();
+        
         // Write to file
         OutputFile << output;
-
         OutputFile.close();
+        
+        std::cout << "Output successfully saved to: " << FullPath << "\n";
     }
-} 
-
+    else 
+    {
+        std::cerr << "Error: cannot open output file " << FullPath << "\n";
+    }
+}
 } // End of main function

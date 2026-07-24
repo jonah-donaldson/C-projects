@@ -4,6 +4,7 @@
 #include <random>
 #include <memory> 
 #include <vector>
+#include <filesystem> // Potentially add automated still life output to a folder
 
 #include <GolGrid.h>
 #include <GolIterator.h>
@@ -257,7 +258,7 @@ int main(int argc, char **argv)
     for (size_t i = 0; i < TrialsToRun; ++i)
     {
         // Create a random grid
-        unsigned int TrialSeed = ((SeedVal + ((TrialsToRun + 1) * rank)) + i); // Unique but reproducible seed per trial
+        unsigned int TrialSeed = SeedVal + (rank * MaxTrials) + i; // Unique but reproducible seed per trial
         std::mt19937 rng(SeedSpecified ? TrialSeed : rd()); // Get a new seed for each trial
         gol::Grid grid(rows, cols, NumAliveCells, rng);
 
@@ -294,10 +295,11 @@ int main(int argc, char **argv)
 
                         // Check that sent data has been received  
                         MPI_Request request[3];
-
-                        MPI_Isend(&PatternRows, 1, MPI_UNSIGNED_LONG, 0, TAG_SL_PATTERN, MPI_COMM_WORLD, &request[0]);
-                        MPI_Isend(&PatternCols, 1, MPI_UNSIGNED_LONG, 0, TAG_SL_PATTERN, MPI_COMM_WORLD, &request[1]);
-                        MPI_Isend(PatternCells.get(), PatternSize, MPI_CXX_BOOL, 0, TAG_SL_PATTERN, MPI_COMM_WORLD, &request[2]);
+                        
+                        // Use blocking sends to ensure memory is safely transmitted before scope ends
+                        MPI_Send(&PatternRows, 1, MPI_UNSIGNED_LONG, 0, TAG_SL_PATTERN, MPI_COMM_WORLD);
+                        MPI_Send(&PatternCols, 1, MPI_UNSIGNED_LONG, 0, TAG_SL_PATTERN, MPI_COMM_WORLD);
+                        MPI_Send(PatternCells.get(), PatternSize, MPI_CXX_BOOL, 0, TAG_SL_PATTERN, MPI_COMM_WORLD);
                     }
                 }
                 break; // Exit the loop if a still life is found
@@ -315,33 +317,32 @@ int main(int argc, char **argv)
 
         if (rank == 0)
         {
-            int flag = 0; // Flag to check if a message is available
-            MPI_Status status; // Status object to hold message info
+            int flag = 0; 
+            MPI_Status status; 
 
-            // Check for messages from any source with the specific tag
+            // Check for messages from any source
             MPI_Iprobe(MPI_ANY_SOURCE, TAG_SL_PATTERN, MPI_COMM_WORLD, &flag, &status);
 
-            if (flag) 
+            // DRAIN THE QUEUE: Process all waiting messages before moving on
+            while (flag) 
             {
-                // A message with TAG_SL_PATTERN is available from status.MPI_SOURCE
                 size_t ReceivedRows, ReceivedCols;
                 MPI_Recv(&ReceivedRows, 1, MPI_UNSIGNED_LONG, status.MPI_SOURCE, TAG_SL_PATTERN, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
                 MPI_Recv(&ReceivedCols, 1, MPI_UNSIGNED_LONG, status.MPI_SOURCE, TAG_SL_PATTERN, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
                 
-                // Create a new grid object with the received data
                 std::unique_ptr<bool[]> ReceivedCells = std::make_unique<bool[]>(ReceivedRows * ReceivedCols);
                 MPI_Recv(ReceivedCells.get(), ReceivedRows * ReceivedCols, MPI_CXX_BOOL, status.MPI_SOURCE, TAG_SL_PATTERN, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-                // Make Grid
-                gol::Grid RecievedPattern (ReceivedRows, ReceivedCols, ReceivedCells.get());
+                gol::Grid RecievedPattern(ReceivedRows, ReceivedCols, ReceivedCells.get());
                 
-                // Check Global uniqueness
                 if (RecievedPattern.IsUnique(GlobalKnownSL))
                 {
-                    // Add the still life pattern to the global list
                     GlobalKnownSL.emplace_back(std::move(RecievedPattern));
                     StillLivesFound++;
                 }
+
+                // Check if there are MORE messages waiting
+                MPI_Iprobe(MPI_ANY_SOURCE, TAG_SL_PATTERN, MPI_COMM_WORLD, &flag, &status);
             }
 
             if (StillLivesFound >= NumStillLifes)

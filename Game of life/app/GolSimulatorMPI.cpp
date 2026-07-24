@@ -6,6 +6,7 @@
 #include <vector> // For std::vector
 #include <memory> // For std::unique_ptr
 #include <random> // For std::random_device, std::mt19937
+#include <filesystem> // For std::filesystem
 
 #include "GolGrid.h"
 #include "GolIterator.h"
@@ -311,123 +312,80 @@ int main(int argc, char **argv)
     // Get the coordinates of the current process in the grid
     MPI_Cart_coords(cartComm, rank, 2, coords);
     int nbr_up, nbr_down, nbr_left, nbr_right;
-    int nbr_ul, nbr_ur, nbr_dl, nbr_dr;
 
     // Get the ranks of cardinal neighboring processes
     MPI_Cart_shift(cartComm, 0, 1, &nbr_up, &nbr_down); // up/down neighbors
     MPI_Cart_shift(cartComm, 1, 1, &nbr_left, &nbr_right); // left/right neighbors
-
-   // Calculate and get ranks of diagonal neighbors, handling boundaries
-   int diag_coords[2];
-   int* nbr_vars[] = {&nbr_ul, &nbr_ur, &nbr_dl, &nbr_dr};
-   int offsets[][2] = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}}; // UL, UR, DL, DR
-
-   for (int i = 0; i < 4; ++i) 
-   {
-       diag_coords[0] = coords[0] + offsets[i][0];
-       diag_coords[1] = coords[1] + offsets[i][1];
-
-       if (diag_coords[0] >= 0 && diag_coords[0] < dims[0] && 
-           diag_coords[1] >= 0 && diag_coords[1] < dims[1]) 
-       {
-           MPI_Cart_rank(cartComm, diag_coords, nbr_vars[i]);
-       } 
-       else 
-       {
-           *nbr_vars[i] = MPI_PROC_NULL;
-       }
-   }
 
     // print subgrids for debugging
     // std::cout << "Rank " << rank << " Subgrid:\n";
     // SubGrid.print();
     // std::cout << "\n";
     
-    // // --- Run the simulation --- //
+    // --- Run the simulation --- //
     int nrows = SubGrid.GetRows();
     int ncols = SubGrid.GetCols();
+    int PaddedRows = nrows + 2;
+    int PaddedCols = ncols + 2;
 
-    // Prepare buffers for Sendrecv
-    // To send
-    std::unique_ptr<bool[]> TopBuf(new bool[ncols]());
-    std::unique_ptr<bool[]> BottomBuf(new bool[ncols]());
+    // Prepare buffers for Sendrecv (Top and Bottom and wide to hold corners)
+    std::unique_ptr<bool[]> TopBuf(new bool[PaddedCols]());
+    std::unique_ptr<bool[]> BottomBuf(new bool[PaddedCols]());
     std::unique_ptr<bool[]> LeftBuf(new bool[nrows]());
     std::unique_ptr<bool[]> RightBuf(new bool[nrows]()); 
 
-    // To receive
-    std::unique_ptr<bool[]> RecvTop(new bool[ncols]()); // Initialise to false. Such that for MPI_Null, cells are dead.
-    std::unique_ptr<bool[]> RecvBottom(new bool[ncols]());
+    std::unique_ptr<bool[]> RecvTop(new bool[PaddedCols]()); 
+    std::unique_ptr<bool[]> RecvBottom(new bool[PaddedCols]());
     std::unique_ptr<bool[]> RecvLeft(new bool[nrows]());
     std::unique_ptr<bool[]> RecvRight(new bool[nrows]());
 
-    // Corners to recieve. Initialised to false such that for MPI_Null, cells are dead.
-    bool recvTL = false, recvTR = false, recvBL = false, recvBR = false;
+    // Allocate the PaddedGrid
+    gol::Grid PaddedGrid(PaddedRows, PaddedCols);
 
     // Make sure all processes are ready before starting the simulation
     MPI_Barrier(MPI_COMM_WORLD);
 
-    for (size_t i = 0; i < generations; ++i) 
+    for (size_t gen = 0; gen < generations; ++gen) 
     {
-        // Fill in send buffers
-        for (int j = 0; j < ncols; ++j) 
+        // 1) Fill Left/Right send buffers
+        for (int row = 0; row < nrows; ++row) 
         {
-            TopBuf[j] = SubGrid.get(0, j); // Top row
-            BottomBuf[j] = SubGrid.get(nrows - 1, j); // Bottom row
-        }
-        for (int i = 0; i < nrows; ++i) 
-        {
-            LeftBuf[i] = SubGrid.get(i, 0); // Left column
-            RightBuf[i] = SubGrid.get(i, ncols - 1); // Right column
+            LeftBuf[row] = SubGrid.get(row, 0); 
+            RightBuf[row] = SubGrid.get(row, ncols - 1); 
         }
 
-        // Corners
-        bool sendTL = SubGrid.get(0, 0);
-        bool sendTR = SubGrid.get(0, ncols - 1);
-        bool sendBL = SubGrid.get(nrows - 1, 0);
-        bool sendBR = SubGrid.get(nrows - 1, ncols - 1);
-
-        // 1) exchange edges with Sendrecv
-        MPI_Sendrecv(TopBuf.get(), ncols, MPI_CXX_BOOL, nbr_up, 0,
-        RecvBottom.get(), ncols, MPI_CXX_BOOL, nbr_down, 0,
-        cartComm, MPI_STATUS_IGNORE);
-
-        MPI_Sendrecv(BottomBuf.get(), ncols, MPI_CXX_BOOL, nbr_down, 1,
-        RecvTop.get(), ncols, MPI_CXX_BOOL, nbr_up, 1,
-        cartComm, MPI_STATUS_IGNORE);
-
+        // 2) Exchange Left/Right edges FIRST
         MPI_Sendrecv(LeftBuf.get(), nrows, MPI_CXX_BOOL, nbr_left, 2,
-        RecvRight.get(), nrows, MPI_CXX_BOOL, nbr_right, 2,
-        cartComm, MPI_STATUS_IGNORE);
+                     RecvRight.get(), nrows, MPI_CXX_BOOL, nbr_right, 2,
+                     cartComm, MPI_STATUS_IGNORE);
 
         MPI_Sendrecv(RightBuf.get(), nrows, MPI_CXX_BOOL, nbr_right, 3,
-        RecvLeft.get(), nrows, MPI_CXX_BOOL, nbr_left, 3,
-        cartComm, MPI_STATUS_IGNORE);
+                     RecvLeft.get(), nrows, MPI_CXX_BOOL, nbr_left, 3,
+                     cartComm, MPI_STATUS_IGNORE);
 
-        // 2) exchange corners with Sendrecv
-        MPI_Sendrecv(&sendTL, 1, MPI_CXX_BOOL, nbr_ul, 4,
-        &recvBR, 1, MPI_CXX_BOOL, nbr_dr, 4,
-        cartComm, MPI_STATUS_IGNORE);
+        // 3) Fill Top/Bottom send buffers (shifted by 1 to leave room for corners)
+        for (int col = 0; col < ncols; ++col) 
+        {
+            TopBuf[col + 1] = SubGrid.get(0, col); 
+            BottomBuf[col + 1] = SubGrid.get(nrows - 1, col); 
+        }
 
-        MPI_Sendrecv(&sendTR, 1, MPI_CXX_BOOL, nbr_ur, 5,
-        &recvBL, 1, MPI_CXX_BOOL, nbr_dl, 5,
-        cartComm, MPI_STATUS_IGNORE);
+        // Add the newly received left/right edge cells as our corners!
+        TopBuf[0] = RecvLeft[0];                      // Top-Left corner
+        TopBuf[PaddedCols - 1] = RecvRight[0];        // Top-Right corner
+        BottomBuf[0] = RecvLeft[nrows - 1];           // Bottom-Left corner
+        BottomBuf[PaddedCols - 1] = RecvRight[nrows - 1]; // Bottom-Right corner
 
-        MPI_Sendrecv(&sendBL, 1, MPI_CXX_BOOL, nbr_dl, 6,
-        &recvTR, 1, MPI_CXX_BOOL, nbr_ur, 6,
-        cartComm, MPI_STATUS_IGNORE);
+        // 4) Exchange Top/Bottom edges SECOND 
+        MPI_Sendrecv(TopBuf.get(), PaddedCols, MPI_CXX_BOOL, nbr_up, 0,
+                     RecvBottom.get(), PaddedCols, MPI_CXX_BOOL, nbr_down, 0,
+                     cartComm, MPI_STATUS_IGNORE);
 
-        MPI_Sendrecv(&sendBR, 1, MPI_CXX_BOOL, nbr_dr, 7,
-        &recvTL, 1, MPI_CXX_BOOL, nbr_ul, 7,
-        cartComm, MPI_STATUS_IGNORE);
+        MPI_Sendrecv(BottomBuf.get(), PaddedCols, MPI_CXX_BOOL, nbr_down, 1,
+                     RecvTop.get(), PaddedCols, MPI_CXX_BOOL, nbr_up, 1,
+                     cartComm, MPI_STATUS_IGNORE);
 
-        // 3) build a padded buffer with halo cells
-        int PaddedRows = nrows + 2;
-        int PaddedCols = ncols + 2;
-
-        // Create a new grid with padding
-        gol::Grid PaddedGrid(PaddedRows, PaddedCols);
-
-        // Fill the inner grid with the current subgrid
+        // 5) Build the Padded buffer
         #pragma omp parallel for collapse(2)
         for (int i = 0; i < nrows; ++i) 
         {
@@ -437,29 +395,25 @@ int main(int argc, char **argv)
             }
         }
 
-        // Fill the top and bottom halo rows
-        for (int j = 0; j < ncols; ++j) 
-        {
-            PaddedGrid.set(0, j + 1, RecvTop[j]); // Top row
-            PaddedGrid.set(PaddedRows - 1, j + 1, RecvBottom[j]); // Bottom row
-        }
         // Fill the left and right halo cols
         for (int i = 0; i < nrows; ++i) 
         {
-            PaddedGrid.set(i + 1, 0, RecvLeft[i]); // Left column
-            PaddedGrid.set(i + 1, PaddedCols - 1, RecvRight[i]); // Right column
+            PaddedGrid.set(i + 1, 0, RecvLeft[i]); 
+            PaddedGrid.set(i + 1, PaddedCols - 1, RecvRight[i]); 
         }
-        // Fill the corners with the received corners
-        PaddedGrid.set(0, 0, recvTL);
-        PaddedGrid.set(0, PaddedCols - 1, recvTR);
-        PaddedGrid.set(PaddedRows - 1, 0, recvBL);
-        PaddedGrid.set(PaddedRows - 1, PaddedCols - 1, recvBR);
 
-        // 4) Create an iterator and take a step
+        // Fill the top and bottom halo rows 
+        for (int j = 0; j < PaddedCols; ++j) 
+        {
+            PaddedGrid.set(0, j, RecvTop[j]); 
+            PaddedGrid.set(PaddedRows - 1, j, RecvBottom[j]); 
+        }
+
+        // 6) Take a step in the simulation using the padded grid
         gol::Iterator iterator(PaddedGrid);
         iterator.takeStep();
 
-        // Copy the inner grid back to the subgrid and repeat
+        // 7) Copy the inner grid back to the subgrid and repeat
         #pragma omp parallel for collapse(2)
         for (int i = 0; i < nrows; ++i) 
         {
@@ -468,8 +422,9 @@ int main(int argc, char **argv)
                 SubGrid.set(i, j, PaddedGrid.get(i + 1, j + 1));
             }
         }
+
         // Print each generation for debugging
-        // std::cout << "Rank " << rank << " Generation " << i + 1 << ":\n";
+        // std::cout << "Rank " << rank << " Generation " << gen + 1 << ":\n";
         // SubGrid.print();
         // std::cout << "\n";
     }
@@ -539,12 +494,18 @@ int main(int argc, char **argv)
         grid.print();
         std::cout << "\n";
         
+        // Write to output file if specified
         if (IsOutputFile) 
         {
-            std::ofstream ofs(OutputFileName);
+            std::filesystem::path OutDir = "./app/outputs";
+            std::filesystem::create_directories(OutDir); 
+            
+            std::filesystem::path FullPath = OutDir / OutputFileName;
+
+            std::ofstream ofs(FullPath);
             if (!ofs) 
             {
-                std::cerr << "Error: cannot open output file " << OutputFileName << "\n";
+                std::cerr << "Error: cannot open output file " << FullPath << "\n";
             } 
             else 
             {
