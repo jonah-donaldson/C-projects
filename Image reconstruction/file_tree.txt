@@ -1,0 +1,57 @@
+Image Reconstruction
+├── app
+│   ├── CMakeLists.txt
+│   ├── FrequencyReconstructor.cpp
+│   └── ImageReconstructor.cpp
+├── CMakeLists.txt
+├── data
+│   ├── app_out
+│   │   ├── UtahTeapot_convolved_dirty.pgm
+│   │   ├── UtahTeapot_convolved_input.pgm
+│   │   ├── UtahTeapot_convolved_reconstructed.pgm
+│   │   ├── UtahTeapot_frequencyLossMeasurements_dirty.pgm
+│   │   ├── UtahTeapot_frequencyLossMeasurements_reconstructed.pgm
+│   │   ├── UtahTeapot_subSampledMeasurements_dirty.pgm
+│   │   └── UtahTeapot_subSampledMeasurements_reconstructed.pgm
+│   ├── measurements
+│   │   ├── UtahTeapot_convolved.dat
+│   │   ├── UtahTeapot_frequencyLossMeasurements.dat
+│   │   └── UtahTeapot_subSampledMeasurements.dat
+│   └── operators
+│       ├── UtahTeapot_sampledFrequencies.dat
+│       └── UtahTeapot_sampledPixels.dat
+├── file_tree.txt
+├── Optimisation
+│   ├── CMakeLists.txt
+│   ├── include
+│   │   ├── DataPack.h
+│   │   ├── DifferentiableFunction.h
+│   │   ├── ImageUtils.h
+│   │   ├── LinearOperator.h
+│   │   ├── NonDifferentiableFunction.h
+│   │   ├── OptimisationUtils.h
+│   │   └── VectorUtils.h
+│   └── src
+│       ├── CMakeLists.txt
+│       ├── ImageUtils.cpp
+│       └── OptimisationUtils.cpp
+├── README.md
+└── test
+    ├── CMakeLists.txt
+    ├── data
+    │   ├── images
+    │   │   ├── TestSphere_convolved.pgm
+    │   │   ├── TestSphere_deconvolved.pgm
+    │   │   └── TestSphere.pgm
+    │   ├── measurements
+    │   │   └── TestSphere_proximal.dat
+    │   └── test_out
+    │       ├── TestSphere_blurred.pgm
+    │       ├── TestSphere_deblurred.pgm
+    │       ├── TestSphere.pgm
+    │       ├── TestSphere_reconstructed.pgm
+    │       ├── TestSphere_sub_sampled.pgm
+    │       ├── UtahTeapot_blurred_dirty.pgm
+    │       ├── UtahTeapot_blurred.pgm
+    │       └── UtahTeapot_convolution_optimised.pgm
+    └── TestOptimisation.cpp
