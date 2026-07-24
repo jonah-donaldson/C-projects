@@ -96,6 +96,12 @@ int main(int argc, char *argv[])
 
         // Apply optimisation
         vector<double> result = OptimisationUtils::IOA<double, double>(gauss, dctl1, image.data, conv, alpha, beta, 500, tol, my_convergence);
+        
+        // Clamp result values to [0, 255] range
+        for (auto& pixel : result) {
+        pixel = std::max(0.0, std::min(255.0, pixel));
+        }
+        
         // Write result
         DataPack<double> result_pack = {image.width, image.height, result};
         ImageUtils::WriteImage(result_pack, output_dir + base_name + "_reconstructed.pgm");
@@ -134,6 +140,12 @@ int main(int argc, char *argv[])
 
         // Apply optimisation (FIXED: Pass image.data, NOT dirty_image_pack.data)
         vector<double> result = OptimisationUtils::IOA<double, double>(gauss, dctl1, image.data, sub_sampler, alpha, beta, 500, tol, my_convergence);
+        
+        // Clamp result values to [0, 255] range
+        for (auto& pixel : result) {
+        pixel = std::max(0.0, std::min(255.0, pixel));
+        }
+        
         // Write result
         DataPack<double> result_pack = {image.width, image.height, result};
         ImageUtils::WriteImage(result_pack, output_dir + base_name + "_reconstructed.pgm");

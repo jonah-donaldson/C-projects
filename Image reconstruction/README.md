@@ -1,4 +1,3 @@
-```markdown
 # C++ Image Reconstruction & Optimization Library
 
 This project is a high-performance, template-driven C++ library designed to solve complex inverse imaging problems. It uses advanced optimization techniques to reconstruct corrupted, blurred, or heavily sub-sampled images back to their original state. 
@@ -48,7 +47,7 @@ This project uses **CMake** for building. Ensure you have CMake (3.21+) and the 
 
 ```bash
 # 1. Generate the build files
-cmake -B build
+cmake -B build -S .
 
 # 2. Compile the project
 cmake --build build
@@ -88,7 +87,7 @@ Reconstructs an image that has been severely blurred by a point-spread function.
 
 ### 2. Spatial Sub-Sampling (Healing Data Loss)
 
-Reconstructs an image where 80% of the physical pixel data has been completely lost.
+Reconstructs an image where a portion of the physical pixel data has been completely lost.
 
 ```bash
 ./build/bin/ImageReconstructor -f data/measurements/UtahTeapot_subSampledMeasurements.dat -i data/operators/UtahTeapot_sampledPixels.dat -alpha 1.0 -beta 10000 -sigma 1.0 -delta 0.01
@@ -120,8 +119,7 @@ To verify the core library math and operator logic, run the compiled Catch2 test
 ## Results
 
 ### Frequency Reconstruction: Before
-![Dirty Image](assets/UtahTeapot_frequencyLossMeasurements_dirty.png)
+![Dirty Image](assets/frequency_dirty.png)
 
 ### Frequency Reconstruction: After
-![Reconstructed Image](assets/UtahTeapot_frequencyLossMeasurements_reconstructed.png)
-
+![Reconstructed Image](assets/frequency_reconstructed.png)
